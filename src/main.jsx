@@ -92,7 +92,7 @@ function App(){
 
   const notify = useCallback((text)=>{setToast(text);setTimeout(()=>setToast(''),2600)},[])
   const isAdmin = profile?.role === 'admin'
-  const displayName = isAdmin ? 'ผู้ดูแลระบบ' : (profile?.full_name || session?.user?.email || '')
+  const displayName = `${profile?.full_name || session?.user?.email || ''} (${isAdmin ? 'ผู้ดูแลระบบ' : 'พนักงาน'})`
 
   useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('bluewell-theme',theme)},[theme])
 
@@ -663,20 +663,7 @@ const forceDeleteProduct = async product => {
 
   const nav=[['dashboard','ภาพรวม',LayoutDashboard],['products','สินค้า',Warehouse],['history','ประวัติ',History],['claims','ส่งเคลม',ShieldAlert],['reports','รายงาน',BarChart3],...(isAdmin?[['settings','ตั้งค่า',Settings]]:[])]
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><div className="brand-mark small">B</div><div><strong>{company?.company_name||'BlueWell Inventory'}</strong><small>{company?.subtitle||'ระบบจัดการสต็อกออนไลน์'}</small></div></div><nav>{nav.map(([id,label,Icon])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{label}</button>)}<button type="button" className="mobile-logout" onClick={logout}><LogOut size={19}/>ออกจากระบบ</button></nav><div className="user-card">
-  <CircleUserRound/>
-  <div>
-    <strong>{displayName}</strong>
-  </div>
-  <button
-    className="icon-btn"
-    onClick={logout}
-    title="ออกจากระบบ"
-    aria-label="ออกจากระบบ"
-  >
-    <LogOut size={18}/>
-  </button>
-</div></aside>
+    <aside className="sidebar"><div className="brand"><div className="brand-mark small">B</div><div><strong>{company?.company_name||'BlueWell Inventory'}</strong><small>{company?.subtitle||'ระบบจัดการสต็อกออนไลน์'}</small></div></div><nav>{nav.map(([id,label,Icon])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{label}</button>)}<button type="button" className="mobile-logout" onClick={logout}><LogOut size={19}/>ออกจากระบบ</button></nav><div className="user-card"><CircleUserRound/><div><strong>{displayName}</strong></div><button className="icon-btn" onClick={logout} title="ออกจากระบบ" aria-label="ออกจากระบบ"><LogOut size={18}/></button></div></aside>
     <main className="main"><header className="topbar"><div><p className="eyebrow">BLUEWELL INVENTORY</p><h1>{nav.find(n=>n[0]===page)?.[1]}</h1></div><div className="top-actions"><span className={`status ${online?'ok':'bad'}`}>{online?<Wifi size={16}/>:<WifiOff size={16}/>} {online?'ออนไลน์':'ออฟไลน์'}</span><button className="btn secondary" onClick={()=>loadAll(session.user)} disabled={busy}><RefreshCw size={17} className={busy?'spin':''}/>รีเฟรช</button></div></header>
 
     {page==='dashboard'&&<div className="content dashboard-page"><section className="metrics"><article><Boxes/><span>รายการสินค้า</span><strong>{products.filter(p=>p.is_active).length}</strong></article><article><Warehouse/><span>คงเหลือรวม</span><strong>{products.reduce((s,p)=>s+Number(p.quantity||0),0).toLocaleString()}</strong></article><article className={lowStockProducts.length?'warning':''}><AlertTriangle/><span>สินค้าใกล้หมด</span><strong>{lowStockProducts.length.toLocaleString()}</strong></article><article><PackageCheck/><span>สินค้าพร้อมใช้งาน</span><strong>{products.filter(p=>p.is_active&&Number(p.quantity||0)>0).length}</strong></article><article className="warning"><ShieldAlert/><span>ค้างส่งเคลม</span><strong>{claimSummary.outstanding.toLocaleString()}</strong></article></section><section className="dashboard-grid"><div className="panel chart-panel"><div className="panel-title"><div><h2>ยอดรับเข้าและเบิกออก</h2><p>การเคลื่อนไหวใน 7 วันล่าสุด</p></div><TrendingUp size={20}/></div><MiniBarChart data={dashboardData} keys={[{key:'restock',label:'เติมสินค้า',className:'restock'},{key:'returned',label:'ตีกลับ',className:'returned'},{key:'issue',label:'เบิกออก',className:'issue'}]}/></div><div className="panel top-products"><div className="panel-title"><div><h2>Top 10 สินค้าเคลื่อนไหว</h2><p>จัดอันดับจากจำนวนรับเข้าและเบิกรวม</p></div></div>{topProducts.length?topProducts.map((p,i)=><div className="rank-row" key={`${p.name}-${i}`}><span className="rank">{i+1}</span><div><strong>{p.name}</strong></div><b>{p.quantity.toLocaleString()}</b></div>):<Empty/>}</div></section>{lowStockProducts.length>0&&<section><div className="panel low-stock-panel"><div className="panel-title"><div><h2>สินค้าใกล้หมด</h2><p>แจ้งเตือนตามระดับที่กำหนดไว้รายสินค้า</p></div><AlertTriangle size={20}/></div>{lowStockProducts.map(p=><div className="list-row" key={p.id}><div><strong>{p.name}</strong><small>แจ้งเตือนเมื่อเหลือไม่เกิน {Number(p.min_stock||0).toLocaleString()} {p.unit}</small></div><span className="badge danger">เหลือ {Number(p.quantity||0).toLocaleString()} {p.unit}</span></div>)}</div></section>}<section><div className="panel"><div className="panel-title"><h2>กิจกรรมล่าสุด</h2></div>{transactions.length?transactions.slice(0,8).map(t=><div className="list-row" key={t.id}><div><strong>{t.products?.name||'-'}</strong><small>{t.document_no} · {t.actor_name}</small></div><span className={`badge ${txBadge(t.transaction_type)}`}>{txSign(t.transaction_type)}{t.quantity}</span></div>):<Empty/>}</div></section></div>}
