@@ -92,13 +92,7 @@ function App(){
 
   const notify = useCallback((text)=>{setToast(text);setTimeout(()=>setToast(''),2600)},[])
   const isAdmin = profile?.role === 'admin'
-  const displayName =
-  profile?.display_name ||
-  profile?.full_name ||
-  user?.user_metadata?.display_name ||
-  user?.user_metadata?.full_name ||
-  user?.email ||
-  'ผู้ใช้งาน';
+  const displayName = `${profile?.display_name || user.email}${isAdmin ? ' (ผู้ดูแลระบบ)' : ''}`;
 
   useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('bluewell-theme',theme)},[theme])
 
