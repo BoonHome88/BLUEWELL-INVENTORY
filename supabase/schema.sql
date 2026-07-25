@@ -227,7 +227,7 @@ begin
     raise exception 'Your account is inactive or profile is missing';
   end if;
 
-  if p_transaction_type not in ('issue', 'restock') then
+  if p_transaction_type not in ('issue', 'restock', 'returned') then
     raise exception 'Invalid transaction type';
   end if;
 
@@ -250,6 +250,9 @@ begin
     end if;
     v_balance_after := v_product.quantity - p_quantity;
     v_prefix := 'BK';
+  elsif p_transaction_type = 'returned' then
+    v_balance_after := v_product.quantity + p_quantity;
+    v_prefix := 'RT';
   else
     v_balance_after := v_product.quantity + p_quantity;
     v_prefix := 'RC';
