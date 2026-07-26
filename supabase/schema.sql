@@ -150,7 +150,7 @@ create index if not exists products_active_idx on public.products(is_active);
 
 create table if not exists public.document_counters (
   counter_date date not null,
-  transaction_type text not null check (transaction_type in ('issue', 'restock')),
+  transaction_type text not null check (transaction_type in ('issue', 'restock', 'returned')),
   last_number integer not null default 0,
   primary key (counter_date, transaction_type)
 );
@@ -159,7 +159,7 @@ create table if not exists public.stock_transactions (
   id uuid primary key default gen_random_uuid(),
   document_no text not null unique,
   product_id uuid not null references public.products(id) on delete restrict,
-  transaction_type text not null check (transaction_type in ('issue', 'restock')),
+  transaction_type text not null check (transaction_type in ('issue', 'restock', 'returned')),
   quantity integer not null check (quantity > 0),
   balance_before integer not null check (balance_before >= 0),
   balance_after integer not null check (balance_after >= 0),
@@ -250,12 +250,12 @@ begin
     end if;
     v_balance_after := v_product.quantity - p_quantity;
     v_prefix := 'BK';
-  elsif p_transaction_type = 'returned' then
-    v_balance_after := v_product.quantity + p_quantity;
-    v_prefix := 'RT';
-  else
+  elsif p_transaction_type = 'restock' then
     v_balance_after := v_product.quantity + p_quantity;
     v_prefix := 'RC';
+  else
+    v_balance_after := v_product.quantity + p_quantity;
+    v_prefix := 'RT';
   end if;
 
   insert into public.document_counters(counter_date, transaction_type, last_number)
