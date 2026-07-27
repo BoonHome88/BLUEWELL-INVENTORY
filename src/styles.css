@@ -76,6 +76,12 @@
 .product-search{height:44px;min-width:0}
 .product-search input{height:42px;min-width:0}
 .product-add-button{height:44px;min-width:126px;padding-inline:16px;white-space:nowrap;line-height:1}
+.products-case-table{min-width:1160px!important}
+.case-conversion-preview{display:grid;grid-template-columns:1fr auto;align-items:center;gap:3px 14px;background:#edf5ff;border:1px solid #cfe2ff;border-radius:14px;padding:14px;margin:16px 0 0}
+.case-conversion-preview span{font-size:13px;color:var(--muted)}
+.case-conversion-preview strong{font-size:21px;color:var(--blue)}
+.case-conversion-preview small{grid-column:1/-1;color:var(--muted)}
+:root[data-theme="dark"] .case-conversion-preview{background:#132943;border-color:#244b75}
 :root[data-theme="dark"] .badge.warning{background:#493b14;color:#ffd978}
 :root[data-theme="dark"] .badge.neutral{background:#23344a;color:#b8c4d5}
 @media(max-width:980px) and (min-width:701px){
@@ -96,3 +102,28 @@
   .product-search,.product-status-filter,.product-add-button{grid-column:1;width:100%}
   .product-search{grid-row:1}.product-status-filter{grid-row:2}.product-add-button{grid-row:3}
 }
+
+/* v3.1 prepack inventory */
+.prepack-warning{display:flex;flex-direction:column;gap:4px}
+.prepack-warning span{font-size:13px}
+.prepack-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.prepack-panel-title{align-items:center}
+.prepack-toolbar .search{min-width:260px}
+.prepack-table{min-width:960px!important}
+.prepack-history-table{min-width:1180px!important}
+.prepack-quantity{font-size:18px;color:var(--blue)}
+.btn.success-action{background:#ecfdf3;color:#067647}
+.btn.warning-action{background:#fff4d6;color:#8a5b00}
+:root[data-theme="dark"] .btn.success-action{background:#12382a;color:#72e0ad}
+:root[data-theme="dark"] .btn.warning-action{background:#493b14;color:#ffd978}
+@media(max-width:900px){
+  .prepack-panel-title{align-items:flex-start;flex-direction:column}
+  .prepack-toolbar{width:100%}
+  .prepack-toolbar .search{min-width:0;flex:1}
+}
+@media(max-width:700px){
+  .prepack-metrics{grid-template-columns:1fr 1fr}
+  .prepack-toolbar{display:grid;grid-template-columns:1fr}
+  .prepack-toolbar .search,.prepack-toolbar .btn{width:100%}
+}
+@media(max-width:430px){.prepack-metrics{grid-template-columns:1fr}}
