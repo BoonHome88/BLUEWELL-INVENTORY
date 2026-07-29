@@ -2735,7 +2735,7 @@ function App() {
               <div className="panel-title">
                 <div>
                   <h2>สร้างผู้ใช้งาน</h2>
-                  <p>สร้างผ่าน Supabase Auth โดยตรง ไม่ต้องใช้ Edge Function</p>
+                  <p>โปรครักษารหัสผ่านของท่าน พบข้อสงสัยเกี่ยวกับการใช้งานโปรดติดต่อผู้ดูแลระบบ</p>
                 </div>
                 <UserPlus size={20} />
               </div>
