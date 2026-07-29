@@ -2779,7 +2779,7 @@ function App() {
               <div className="panel-title">
                 <div>
                   <h2>Development Mode</h2>
-                  <p>เปิดเพื่อแสดงปุ่ม Force Delete เฉพาะผู้ดูแลระบบ</p>
+                  <p>ระบบ Force Delete ห้ามกด (สำหรับ Armm เท่านั้น!!!!)</p>
                 </div>
                 <button
                   type="button"
@@ -2792,8 +2792,8 @@ function App() {
               </div>
               <p className={`info-box ${developmentMode ? "dev-on" : ""}`}>
                 {developmentMode
-                  ? "กำลังเปิดใช้งาน: สามารถลบสินค้าและประวัติทดลองแบบถาวรได้"
-                  : "ปิดอยู่: ระบบจะซ่อนปุ่มลบข้อมูลทดลองทั้งหมด"}
+                  ? "กำลังเปิดใช้งาน: ระบบ Force Delete กำลังทำงานอยู่ตอนนี้"
+                  : "ปิดอยู่: ระบบ Force Delete ไม่ทำงาน"}
               </p>
             </section>
             <section className="panel user-list">
