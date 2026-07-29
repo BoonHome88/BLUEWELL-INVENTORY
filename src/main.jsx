@@ -416,35 +416,41 @@ function App() {
 
   useEffect(() => {
     if (stage !== "app") return;
+    let reloadTimer;
+    const scheduleReload = () => {
+      window.clearTimeout(reloadTimer);
+      reloadTimer = window.setTimeout(() => loadAll(session.user), 500);
+    };
     const channel = supabase
       .channel("bluewell-live")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products" },
-        () => loadAll(session.user),
+        scheduleReload,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "stock_transactions" },
-        () => loadAll(session.user),
+        scheduleReload,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "prepack_inventory" },
-        () => loadAll(session.user),
+        scheduleReload,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "prepack_transactions" },
-        () => loadAll(session.user),
+        scheduleReload,
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "company_settings" },
-        () => loadAll(session.user),
+        scheduleReload,
       )
       .subscribe();
     return () => {
+      window.clearTimeout(reloadTimer);
       supabase.removeChannel(channel);
     };
   }, [stage, session, loadAll]);
@@ -1214,6 +1220,54 @@ function App() {
       await loadAll(session.user);
     } catch (error) {
       notify(`ลบไม่สำเร็จ: ${error.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteIncorrectTransaction = async (transaction) => {
+    if (!isAdmin || busy) return;
+    if (
+      transaction.transaction_type === "issue" &&
+      Number(claimedByIssue[transaction.id] || 0) > 0
+    ) {
+      notify("ลบไม่ได้ เนื่องจากเอกสารเบิกนี้มีรายการเคลมเชื่อมโยงอยู่");
+      return;
+    }
+
+    const productName = transaction.products?.name || "สินค้านี้";
+    const signedEffect =
+      transaction.transaction_type === "issue"
+        ? `คืน ${Number(transaction.quantity).toLocaleString()} ชิ้น`
+        : `หัก ${Number(transaction.quantity).toLocaleString()} ชิ้น`;
+    const confirmed = window.confirm(
+      `ลบเอกสาร ${transaction.document_no} แบบเสมือนไม่เคยมีรายการนี้หรือไม่?\n\nสินค้า: ${productName}\nผลต่อสต็อก: ${signedEffect}\n\nระบบจะคำนวณยอดคงเหลือของรายการถัดไปใหม่ทั้งหมด การดำเนินการนี้ย้อนกลับไม่ได้`,
+    );
+
+    if (!confirmed) return;
+
+    const verify = window.prompt(
+      `พิมพ์เลขเอกสาร ${transaction.document_no} เพื่อยืนยัน`,
+    );
+    if (verify?.trim() !== transaction.document_no) {
+      notify("ยกเลิกการลบ เนื่องจากเลขเอกสารไม่ตรง");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc(
+        "delete_incorrect_stock_transaction",
+        { p_transaction_id: transaction.id },
+      );
+      if (error) throw error;
+
+      notify(
+        `ลบ ${data?.deleted_document_no || transaction.document_no} แล้ว · คงเหลือใหม่ ${Number(data?.new_quantity || 0).toLocaleString()} ชิ้น`,
+      );
+      await loadAll(session.user);
+    } catch (error) {
+      notify(`ลบรายการไม่สำเร็จ: ${error.message}`);
     } finally {
       setBusy(false);
     }
@@ -2096,6 +2150,7 @@ function App() {
                       <th>ผู้ทำรายการ</th>
                       <th>เคลม</th>
                       <th>หมายเหตุ</th>
+                      {isAdmin && <th>จัดการ</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -2151,6 +2206,19 @@ function App() {
                           )}
                         </td>
                         <td>{t.note || "-"}</td>
+                        {isAdmin && (
+                          <td>
+                            <button
+                              type="button"
+                              className="icon-btn danger-button"
+                              title="ลบรายการที่กรอกผิด"
+                              disabled={busy}
+                              onClick={() => deleteIncorrectTransaction(t)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -2579,6 +2647,7 @@ function App() {
                       <th>คงเหลือ</th>
                       <th>ผู้ทำรายการ</th>
                       <th>หมายเหตุ</th>
+                      {isAdmin && <th className="no-print">จัดการ</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -2608,6 +2677,19 @@ function App() {
                         <td>{Number(t.balance_after).toLocaleString()}</td>
                         <td>{t.actor_name || "-"}</td>
                         <td>{t.note || "-"}</td>
+                        {isAdmin && (
+                          <td className="no-print">
+                            <button
+                              type="button"
+                              className="icon-btn danger-button"
+                              title="ลบรายการที่กรอกผิด"
+                              disabled={busy}
+                              onClick={() => deleteIncorrectTransaction(t)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
