@@ -556,7 +556,7 @@ create table if not exists public.offline_import_rows (
   offline_operator text not null,
   offline_note text not null,
   scanned_at timestamptz,
-  transaction_id uuid not null unique references public.stock_transactions(id) on delete restrict,
+  transaction_id uuid not null unique references public.stock_transactions(id) on delete cascade,
   created_at timestamptz not null default now(),
   unique (batch_id, row_id)
 );
