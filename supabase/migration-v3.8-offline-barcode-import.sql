@@ -1,4 +1,4 @@
-+-- BlueWell Inventory v3.8
+-- BlueWell Inventory v3.8
 -- Product barcodes and atomic offline issue imports.
 
 alter table public.products
@@ -190,4 +190,3 @@ grant select on public.offline_import_batches, public.offline_import_rows to aut
 
 revoke all on function public.import_offline_issue_batch(text, text, jsonb) from public;
 grant execute on function public.import_offline_issue_batch(text, text, jsonb) to authenticated;
-
