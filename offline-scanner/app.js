@@ -17,7 +17,7 @@ function renderUpdated(){
   $("parcelCount").textContent=tp.length;
   $("issueCount").textContent=ti.length;
   $("parcelRows").innerHTML=tp.slice().reverse().slice(0,10).map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td>${new Date(x.created_at).toLocaleTimeString("th-TH")}</td><td>${safe(x.operator)}</td></tr>`).join("")||`<tr><td colspan="3">ยังไม่มีรายการ</td></tr>`;
-  $("issueRows").innerHTML=ti.slice().reverse().slice(0,10).map(x=>`<tr><td><b>${safe(x.product_name)}</b><br><code>${safe(x.barcode)}</code></td><td>${x.quantity} ${safe(x.unit)}</td><td>${safe(x.note)}</td><td>${safe(x.operator)}</td><td>${new Date(x.scanned_at).toLocaleTimeString("th-TH")}</td><td>${x.batch_id?`<span class="exported-label">ส่งออกแล้ว</span>`:`<button class="delete-issue" data-delete-issue="${safe(x.row_id)}">ลบ</button>`}</td></tr>`).join("")||`<tr><td colspan="6">ยังไม่มีรายการ</td></tr>`;
+  $("issueRows").innerHTML=ti.slice().reverse().slice(0,10).map(x=>`<tr><td><b>${safe(x.product_name)}</b><br><code>${safe(x.barcode)}</code></td><td>${x.quantity} ${safe(x.unit)}</td><td>${safe(x.note)}</td><td>${safe(x.operator)}</td><td>${new Date(x.scanned_at).toLocaleTimeString("th-TH")}</td><td><div class="issue-actions">${x.batch_id?`<span class="exported-label">ส่งออกแล้ว</span>`:""}<button class="delete-issue" data-delete-issue="${safe(x.row_id)}">ลบ</button></div></td></tr>`).join("")||`<tr><td colspan="6">ยังไม่มีรายการ</td></tr>`;
   $("productSummary").textContent=`${products.length.toLocaleString()} รายการ · อัปเดตล่าสุด ${localStorage.getItem(key("products-updated"))||"-"}`;
   $("productRows").innerHTML=products.map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td><b>${safe(x.name)}</b></td><td>${safe(x.unit)}</td><td>${Number(x.stock||0).toLocaleString()} ${safe(x.unit)}</td></tr>`).join("")||`<tr><td colspan="4">กรุณานำเข้าไฟล์รายการสินค้าจากเว็บสต็อก</td></tr>`;
   const history=[...parcels.map(x=>({...x,type:"พัสดุ",name:x.barcode,quantity:"1 กล่อง",note:"",time:x.created_at})),...issues.map(x=>({...x,type:"เบิกสินค้า",name:x.product_name,quantity:`${x.quantity} ${x.unit}`,time:x.scanned_at}))].sort((a,b)=>b.time.localeCompare(a.time));
@@ -28,8 +28,8 @@ $("issueRows").addEventListener("click",e=>{
   if(!button)return;
   const row=issues.find(x=>x.row_id===button.dataset.deleteIssue);
   if(!row)return;
-  if(row.batch_id)return toast("รายการนี้ส่งออกแล้ว ต้องแก้ไขจากเว็บสต็อก");
-  if(!confirm(`ลบรายการเบิก “${row.product_name}” จำนวน ${row.quantity} ${row.unit} หรือไม่?`))return;
+  const warning=row.batch_id?"\n\nรายการนี้ส่งออก Excel แล้ว การลบจะไม่แก้ไฟล์เดิมและไม่คืนยอดในเว็บสต็อก":"";
+  if(!confirm(`ลบรายการเบิก “${row.product_name}” จำนวน ${row.quantity} ${row.unit} ออกจากเครื่องนี้หรือไม่?${warning}`))return;
   issues=issues.filter(x=>x.row_id!==row.row_id);
   save();render();toast("ลบรายการเบิกแล้ว");
 });
