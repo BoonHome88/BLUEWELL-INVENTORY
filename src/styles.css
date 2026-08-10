@@ -1423,7 +1423,7 @@ code {
 }
 .products-toolbar {
   display: grid;
-  grid-template-columns: 150px minmax(220px, 320px) auto;
+  grid-template-columns: 150px minmax(220px, 320px) auto auto;
   align-items: center;
   gap: 10px;
   width: auto;
@@ -1446,6 +1446,10 @@ code {
   padding-inline: 16px;
   white-space: nowrap;
   line-height: 1;
+}
+.product-offline-export {
+  height: 44px;
+  white-space: nowrap;
 }
 .products-case-table {
   min-width: 1160px !important;
@@ -1492,7 +1496,7 @@ code {
   }
   .products-toolbar {
     width: 100%;
-    grid-template-columns: 150px minmax(0, 1fr) auto;
+    grid-template-columns: 150px minmax(0, 1fr) auto auto;
   }
 }
 @media (max-width: 700px) {
@@ -1520,6 +1524,10 @@ code {
     grid-column: 1;
     grid-row: 2;
   }
+  .product-offline-export {
+    grid-column: 1/-1;
+    grid-row: 3;
+  }
   .product-add-button {
     grid-column: 2;
     grid-row: 2;
@@ -1542,8 +1550,11 @@ code {
   .product-status-filter {
     grid-row: 2;
   }
-  .product-add-button {
+  .product-offline-export {
     grid-row: 3;
+  }
+  .product-add-button {
+    grid-row: 4;
   }
 }
 
@@ -1620,5 +1631,40 @@ code {
 @media (max-width: 430px) {
   .prepack-metrics {
     grid-template-columns: 1fr;
+  }
+}
+
+/* v3.8 product barcodes and offline issue imports */
+.barcode-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.barcode-cell code {
+  font-size: 12px;
+}
+.offline-import-page {
+  display: grid;
+  gap: 18px;
+}
+.offline-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.offline-import-table {
+  min-width: 1180px !important;
+}
+.offline-import-table td {
+  vertical-align: top;
+}
+.offline-import-note {
+  margin: 16px;
+}
+@media (max-width: 700px) {
+  .offline-import-actions,
+  .offline-import-actions .btn {
+    width: 100%;
   }
 }

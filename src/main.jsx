@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
+import JsBarcode from "jsbarcode";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -38,6 +40,8 @@ import {
   Upload,
   Image as ImageIcon,
   Database,
+  Barcode,
+  FileUp,
 } from "lucide-react";
 import { supabase } from "./supabase";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
@@ -105,6 +109,20 @@ const productImageUrl = (path = "") =>
     : "";
 const safeFileName = (name = "image") =>
   name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+const createBarcodeValue = () =>
+  `BW-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+const excelDate = (value) => {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed)
+      return new Date(
+        Date.UTC(parsed.y, parsed.m - 1, parsed.d, parsed.H, parsed.M, parsed.S),
+      ).toISOString();
+  }
+  const date = new Date(value || Date.now());
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+};
 const timeout = (promise, ms = 15000) =>
   Promise.race([
     promise,
@@ -254,6 +272,10 @@ function App() {
   const [piecesPerCase, setPiecesPerCase] = useState(1);
   const [loosePieces, setLoosePieces] = useState(0);
   const [backupBusy, setBackupBusy] = useState(false);
+  const [offlineFile, setOfflineFile] = useState(null);
+  const [offlineBatchId, setOfflineBatchId] = useState("");
+  const [offlineRows, setOfflineRows] = useState([]);
+  const [offlineImportError, setOfflineImportError] = useState("");
 
   const notify = useCallback((text) => {
     setToast(text);
@@ -488,12 +510,16 @@ function App() {
     const autoSku =
       editing?.sku ||
       `BW-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const barcode = String(f.get("barcode") || autoSku)
+      .trim()
+      .toUpperCase();
     const unitsPerCase = Math.max(1, Number(f.get("units_per_case") || 1));
     const initialQuantity =
       Math.max(0, Number(f.get("case_count") || 0)) * unitsPerCase +
       Math.max(0, Number(f.get("loose_quantity") || 0));
     const payload = {
       sku: autoSku,
+      barcode,
       name: f.get("name").trim(),
       category_id: editing?.category_id || null,
       unit: "ชิ้น",
@@ -593,6 +619,147 @@ function App() {
       notify(`สำรองข้อมูลไม่สำเร็จ: ${error.message}`);
     } finally {
       setBackupBusy(false);
+    }
+  };
+
+  const exportOfflineProductMaster = () => {
+    const rows = products
+      .filter((p) => p.is_active)
+      .map((p) => ({
+        บาร์โค้ดสินค้า: p.barcode || p.sku,
+        รหัสสินค้าในระบบ: p.id,
+        ชื่อสินค้า: p.name,
+        หน่วย: p.unit || "ชิ้น",
+        จำนวนชิ้นต่อลัง: Number(p.units_per_case || 1),
+        คงเหลือคลังกลาง: Number(p.quantity || 0),
+      }));
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    sheet["!cols"] = [18, 38, 34, 12, 18, 18].map((wch) => ({ wch }));
+    XLSX.utils.book_append_sheet(workbook, sheet, "สินค้า");
+    XLSX.writeFile(
+      workbook,
+      `BlueWell-Offline-Products-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+    notify("ส่งออกรายการสินค้าสำหรับเครื่องออฟไลน์แล้ว");
+  };
+
+  const printProductBarcode = (product) => {
+    const value = String(product.barcode || product.sku || "").trim();
+    if (!value) return notify("สินค้านี้ยังไม่มีบาร์โค้ด");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    JsBarcode(svg, value, {
+      format: "CODE128",
+      displayValue: true,
+      fontSize: 16,
+      height: 56,
+      margin: 10,
+    });
+    const popup = window.open("", "_blank", "width=520,height=420");
+    if (!popup) return notify("กรุณาอนุญาตหน้าต่างป๊อปอัปเพื่อพิมพ์บาร์โค้ด");
+    popup.document.write(`<!doctype html><html lang="th"><head><title>พิมพ์บาร์โค้ด</title><style>body{font-family:Tahoma,sans-serif;display:grid;place-items:center;padding:30px}.label{text-align:center;border:1px dashed #bbb;padding:22px;min-width:360px}.label h2{font-size:18px;margin:0 0 12px}@media print{.no-print{display:none}.label{border:0}}</style></head><body><div class="label"><h2>${product.name.replaceAll("<", "&lt;")}</h2>${svg.outerHTML}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    popup.document.close();
+  };
+
+  const readOfflineIssueFile = async (e) => {
+    const file = e.target.files?.[0];
+    setOfflineFile(file || null);
+    setOfflineRows([]);
+    setOfflineBatchId("");
+    setOfflineImportError("");
+    if (!file) return;
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), {
+        type: "array",
+        cellDates: true,
+      });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (!rawRows.length) throw new Error("ไม่พบรายการเบิกในไฟล์");
+      const productByBarcode = new Map(
+        products.map((p) => [String(p.barcode || p.sku).trim().toUpperCase(), p]),
+      );
+      const normalized = rawRows.map((row, index) => {
+        const barcode = String(
+          row["บาร์โค้ดสินค้า"] || row.barcode || row["Barcode"] || "",
+        )
+          .trim()
+          .toUpperCase();
+        const quantity = Number(row["จำนวนเบิก"] || row.quantity || 0);
+        const note = String(
+          row["หมายเหตุการเบิก"] || row.note || row["หมายเหตุ"] || "",
+        ).trim();
+        const operator = String(
+          row["ผู้เบิก"] || row.operator || row["ผู้สแกน"] || "",
+        ).trim();
+        const batchId = String(
+          row["รหัสชุดนำเข้า"] || row.batch_id || "",
+        ).trim();
+        const rowId = String(row["รหัสรายการ"] || row.row_id || `${index + 1}`);
+        const product = productByBarcode.get(barcode);
+        const errors = [];
+        if (!barcode) errors.push("ไม่มีบาร์โค้ด");
+        if (!product) errors.push("ไม่พบสินค้า");
+        if (!Number.isInteger(quantity) || quantity <= 0)
+          errors.push("จำนวนไม่ถูกต้อง");
+        if (!note) errors.push("ไม่มีหมายเหตุ");
+        if (!operator) errors.push("ไม่มีผู้เบิก");
+        if (product && quantity > Number(product.quantity || 0))
+          errors.push(`สต็อกไม่พอ (เหลือ ${product.quantity})`);
+        return {
+          row_id: rowId,
+          batch_id: batchId,
+          barcode,
+          product,
+          quantity,
+          note,
+          operator,
+          scanned_at: excelDate(
+            row["วันเวลา"] || row.scanned_at || row["วันที่เวลา"],
+          ),
+          errors,
+        };
+      });
+      const batchIds = [...new Set(normalized.map((r) => r.batch_id).filter(Boolean))];
+      if (batchIds.length !== 1)
+        throw new Error("ไฟล์ต้องมีรหัสชุดนำเข้าเดียวกันครบทุกแถว");
+      if (normalized.some((r) => !r.batch_id))
+        throw new Error("มีรายการที่ไม่มีรหัสชุดนำเข้า");
+      setOfflineBatchId(batchIds[0]);
+      setOfflineRows(normalized);
+    } catch (error) {
+      setOfflineImportError(error.message || String(error));
+    }
+  };
+
+  const importOfflineIssues = async () => {
+    if (!offlineRows.length || offlineRows.some((row) => row.errors.length))
+      return notify("กรุณาแก้ไขข้อผิดพลาดในไฟล์ก่อนนำเข้า");
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("import_offline_issue_batch", {
+        p_batch_id: offlineBatchId,
+        p_source_filename: offlineFile?.name || "offline-issue.xlsx",
+        p_rows: offlineRows.map((row) => ({
+          row_id: row.row_id,
+          barcode: row.barcode,
+          quantity: row.quantity,
+          note: row.note,
+          operator: row.operator,
+          scanned_at: row.scanned_at,
+        })),
+      });
+      if (error) throw error;
+      notify(`นำเข้าสำเร็จ ${Number(data?.imported_count || offlineRows.length)} รายการ`);
+      setOfflineFile(null);
+      setOfflineBatchId("");
+      setOfflineRows([]);
+      setOfflineImportError("");
+      await loadAll(session.user);
+    } catch (error) {
+      notify(`นำเข้าไม่สำเร็จ: ${error.message}`);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -1300,7 +1467,7 @@ function App() {
         const matchesStatus =
           productStatusFilter === "all" ||
           (productStatusFilter === "active" ? p.is_active : !p.is_active);
-        const matchesQuery = String(p.name || "")
+        const matchesQuery = `${p.name || ""} ${p.barcode || ""} ${p.sku || ""}`
           .toLowerCase()
           .includes(query.toLowerCase());
         return matchesStatus && matchesQuery;
@@ -1340,7 +1507,7 @@ function App() {
       transactions.filter(
         (t) =>
           (!typeFilter || t.transaction_type === typeFilter) &&
-          `${t.document_no} ${t.products?.name || ""} ${t.actor_name}`
+          `${t.document_no} ${t.products?.name || ""} ${t.actor_name} ${t.note || ""}`
             .toLowerCase()
             .includes(historyQuery.toLowerCase()),
       ),
@@ -1703,6 +1870,7 @@ function App() {
     ["products", "สินค้า", Warehouse],
     ["prepack", "พรีแพ็ค", PackageCheck],
     ["history", "ประวัติ", History],
+    ...(isAdmin ? [["offline-import", "นำเข้าเบิกออฟไลน์", FileUp]] : []),
     ["claims", "ส่งเคลม", ShieldAlert],
     ["reports", "รายงาน", BarChart3],
     ...(isAdmin ? [["settings", "ตั้งค่า", Settings]] : []),
@@ -1939,6 +2107,14 @@ function App() {
                       placeholder="ค้นหาสินค้า"
                     />
                   </div>
+                  <button
+                    type="button"
+                    className="btn secondary product-offline-export"
+                    onClick={exportOfflineProductMaster}
+                  >
+                    <Download size={17} />
+                    ส่งสินค้าไปเครื่องออฟไลน์
+                  </button>
                   {isAdmin && (
                     <button
                       className="btn primary product-add-button"
@@ -1962,6 +2138,7 @@ function App() {
                   <thead>
                     <tr>
                       <th>สินค้า</th>
+                      <th>บาร์โค้ด</th>
                       <th>จำนวนลัง</th>
                       <th>จำนวนต่อลัง</th>
                       <th>คงเหลือ</th>
@@ -2011,6 +2188,19 @@ function App() {
                                   </small>
                                 )}
                               </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="barcode-cell">
+                              <code>{p.barcode || p.sku}</code>
+                              <button
+                                type="button"
+                                className="icon-btn"
+                                title="พิมพ์ฉลากบาร์โค้ด"
+                                onClick={() => printProductBarcode(p)}
+                              >
+                                <Barcode size={16} />
+                              </button>
                             </div>
                           </td>
                           <td>
@@ -2106,6 +2296,123 @@ function App() {
                 )}
               </div>
             </section>
+          </div>
+        )}
+
+        {page === "offline-import" && isAdmin && (
+          <div className="content offline-import-page">
+            <section className="panel offline-import-intro">
+              <div className="panel-title">
+                <div>
+                  <h2>นำเข้าใบเบิกจากเครื่องออฟไลน์</h2>
+                  <p>
+                    เลือกไฟล์ Excel ที่ส่งออกจากระบบยิงบาร์โค้ด
+                    ตรวจสอบข้อมูล แล้วจึงยืนยันตัดคลังกลาง
+                  </p>
+                </div>
+                <FileUp size={24} />
+              </div>
+              <div className="offline-import-actions">
+                <label className="btn primary file-button">
+                  <FileSpreadsheet size={18} />
+                  เลือกไฟล์ใบเบิก .xlsx
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={readOfflineIssueFile}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={exportOfflineProductMaster}
+                >
+                  <Download size={18} />
+                  ส่งออกรายการสินค้าไปเครื่องออฟไลน์
+                </button>
+              </div>
+              {offlineFile && (
+                <p className="info-box">
+                  ไฟล์: <strong>{offlineFile.name}</strong>
+                  {offlineBatchId && (
+                    <> · รหัสชุดนำเข้า: <code>{offlineBatchId}</code></>
+                  )}
+                </p>
+              )}
+              {offlineImportError && (
+                <p className="error-box">{offlineImportError}</p>
+              )}
+            </section>
+
+            {offlineRows.length > 0 && (
+              <section className="panel">
+                <div className="panel-title">
+                  <div>
+                    <h2>ตรวจสอบก่อนนำเข้า</h2>
+                    <p>
+                      {offlineRows.length.toLocaleString()} รายการ · รวม {" "}
+                      {offlineRows
+                        .reduce((sum, row) => sum + Number(row.quantity || 0), 0)
+                        .toLocaleString()} ชิ้น
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={
+                      busy || offlineRows.some((row) => row.errors.length > 0)
+                    }
+                    onClick={importOfflineIssues}
+                  >
+                    {busy ? <Spinner /> : <CheckCircle2 size={18} />}
+                    ยืนยันตัดคลังกลาง
+                  </button>
+                </div>
+                <div className="table-wrap">
+                  <table className="offline-import-table">
+                    <thead>
+                      <tr>
+                        <th>ลำดับ</th>
+                        <th>บาร์โค้ด</th>
+                        <th>สินค้า</th>
+                        <th>จำนวน</th>
+                        <th>หมายเหตุการเบิก</th>
+                        <th>ผู้เบิก</th>
+                        <th>วันเวลา</th>
+                        <th>ตรวจสอบ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {offlineRows.map((row, index) => (
+                        <tr key={`${row.row_id}-${index}`}>
+                          <td>{index + 1}</td>
+                          <td><code>{row.barcode || "-"}</code></td>
+                          <td><strong>{row.product?.name || "ไม่พบสินค้า"}</strong></td>
+                          <td>{Number(row.quantity || 0).toLocaleString()} ชิ้น</td>
+                          <td>{row.note || "-"}</td>
+                          <td>{row.operator || "-"}</td>
+                          <td>{new Date(row.scanned_at).toLocaleString("th-TH")}</td>
+                          <td>
+                            {row.errors.length ? (
+                              <span className="badge danger">
+                                {row.errors.join(", ")}
+                              </span>
+                            ) : (
+                              <span className="badge success">พร้อมนำเข้า</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="info-box offline-import-note">
+                  เมื่อยืนยัน ระบบจะตัดคลังกลางและสร้างประวัติการเคลื่อนไหว
+                  โดยนำหมายเหตุและชื่อผู้เบิกจากเครื่องออฟไลน์ไปแสดงในช่องหมายเหตุ
+                  ไฟล์ชุดเดิมไม่สามารถนำเข้าซ้ำได้
+                </p>
+              </section>
+            )}
           </div>
         )}
 
@@ -3215,6 +3522,18 @@ function App() {
           <label>
             ชื่อสินค้า
             <input name="name" defaultValue={editing?.name || ""} required />
+          </label>
+          <label>
+            บาร์โค้ดสินค้า
+            <input
+              name="barcode"
+              defaultValue={editing?.barcode || editing?.sku || ""}
+              placeholder="เว้นว่างเพื่อให้ระบบสร้างรหัส BW อัตโนมัติ"
+            />
+            <small>
+              ใช้บาร์โค้ดจากโรงงานได้ หรือเว้นว่างเพื่อสร้าง Code 128 ใหม่
+              โดยอัตโนมัติ
+            </small>
           </label>
           <label>
             จำนวนชิ้นต่อลัง

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BlueWell Offline Scanner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <aside>
+      <div class="brand"><b>B</b><span>BLUEWELL<small>OFFLINE SCANNER</small></span></div>
+      <button class="nav active" data-page="parcel">▣ สแกนกล่องพัสดุ</button>
+      <button class="nav" data-page="issue">↗ เบิกสินค้า</button>
+      <button class="nav" data-page="products">□ รายการสินค้า</button>
+      <button class="nav" data-page="history">◷ ประวัติ</button>
+      <div class="ready">● พร้อมใช้งานออฟไลน์<small>ข้อมูลเก็บในเครื่องนี้</small></div>
+    </aside>
+    <main>
+      <header><div><h1 id="pageTitle">สแกนกล่องพัสดุ</h1><p id="today"></p></div><label>ผู้ใช้งาน<input id="operator" value="Arm" /></label></header>
+      <div id="toast"></div>
+
+      <section class="page active" id="parcelPage">
+        <div class="metrics"><article><span>สแกนวันนี้</span><strong id="parcelCount">0</strong><small>กล่อง</small></article><button id="exportParcels" class="outline">⇩ ส่งออก Excel วันนี้</button></div>
+        <div class="card scanner"><h2>ยิงบาร์โค้ดกล่องพัสดุ</h2><p>ยิงบาร์โค้ดแล้วเครื่องสแกนกด Enter เพื่อบันทึกอัตโนมัติ</p><form id="parcelForm"><input id="parcelBarcode" placeholder="รอรับเลขบาร์โค้ด..." autocomplete="off" autofocus /><button>บันทึก</button></form></div>
+        <div class="card"><h2>รายการล่าสุด</h2><div class="table"><table><thead><tr><th>เลขพัสดุ</th><th>เวลา</th><th>ผู้สแกน</th></tr></thead><tbody id="parcelRows"></tbody></table></div></div>
+      </section>
+
+      <section class="page" id="issuePage">
+        <div class="metrics"><article><span>รายการเบิกวันนี้</span><strong id="issueCount">0</strong><small>รายการ</small></article><button id="exportIssues" class="outline">⇩ ส่งออกไฟล์เบิก .xlsx</button></div>
+        <div class="card scanner"><h2>สแกนเพื่อเบิกสินค้า</h2><p>ต้องนำเข้าไฟล์รายการสินค้าจาก BlueWell Inventory ก่อนเริ่มใช้งาน</p><form id="issueForm" class="issue-form"><label>บาร์โค้ดสินค้า<input id="issueBarcode" placeholder="ยิงบาร์โค้ดสินค้า..." autocomplete="off" /></label><label>จำนวนเบิก<input id="issueQuantity" type="number" min="1" value="1" /></label><label class="wide">หมายเหตุการเบิก <em>*</em><textarea id="issueNote" required placeholder="ระบุว่าเบิกไปใช้ทำอะไร"></textarea></label><div id="productPreview" class="preview wide">รอยิงบาร์โค้ดสินค้า</div><button>ยืนยันเบิก</button></form></div>
+        <div class="card"><h2>รายการเบิกล่าสุด</h2><div class="table"><table><thead><tr><th>สินค้า</th><th>จำนวน</th><th>หมายเหตุ</th><th>ผู้เบิก</th><th>เวลา</th></tr></thead><tbody id="issueRows"></tbody></table></div></div>
+      </section>
+
+      <section class="page" id="productsPage">
+        <div class="card"><div class="card-head"><div><h2>รายการสินค้าสำหรับสแกน</h2><p id="productSummary">ยังไม่มีข้อมูลสินค้า</p></div><label class="file">⇧ นำเข้าไฟล์สินค้าจากเว็บ<input id="productFile" type="file" accept=".xlsx,.xls" /></label></div><div class="table"><table><thead><tr><th>บาร์โค้ด</th><th>สินค้า</th><th>หน่วย</th><th>ข้อมูลคงเหลือจากเว็บ</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
+      </section>
+
+      <section class="page" id="historyPage">
+        <div class="card"><h2>ประวัติในเครื่อง</h2><div class="table"><table><thead><tr><th>ประเภท</th><th>รายการ</th><th>จำนวน</th><th>หมายเหตุ</th><th>ผู้ทำรายการ</th><th>วันเวลา</th></tr></thead><tbody id="historyRows"></tbody></table></div></div>
+      </section>
+    </main>
+    <script src="vendor/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
