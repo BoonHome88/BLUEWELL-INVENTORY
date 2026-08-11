@@ -46,6 +46,7 @@ import {
 import { supabase } from "./supabase";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
 import "./styles.css";
+import ParcelAudit from "./ParcelAudit";
 
 const FOOTER = "BlueWell Inventory | Powered by Armmm © 2026";
 const TX_LABELS = {
@@ -1871,6 +1872,7 @@ function App() {
     ["prepack", "พรีแพ็ค", PackageCheck],
     ["history", "ประวัติ", History],
     ...(isAdmin ? [["offline-import", "นำเข้าเบิกออฟไลน์", FileUp]] : []),
+    ...(isAdmin ? [["parcel-audit", "ตรวจสอบเลขพัสดุ", FileSpreadsheet]] : []),
     ["claims", "ส่งเคลม", ShieldAlert],
     ["reports", "รายงาน", BarChart3],
     ...(isAdmin ? [["settings", "ตั้งค่า", Settings]] : []),
@@ -2415,6 +2417,8 @@ function App() {
             )}
           </div>
         )}
+
+        {page === "parcel-audit" && isAdmin && <ParcelAudit />}
 
         {page === "history" && (
           <div className="content">
