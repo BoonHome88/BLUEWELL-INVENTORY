@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>BlueWell Offline Scanner</title>
+    <meta name="theme-color" content="#1769e8" />
+    <link rel="icon" type="image/png" href="scanning.png" />
+    <title>BlueWell Offline Scanner - ระบบสแกนบาร์โค้ดออฟไลน์</title>
     <link rel="stylesheet" href="styles.css" />
     <style>
       .delete-issue{border:0;border-radius:8px;padding:7px 10px;background:#fff0ef;color:#b43c34;font-weight:700;cursor:pointer}
@@ -11,6 +13,7 @@
       .exported-label{display:inline-block;border-radius:999px;padding:5px 8px;background:#eef1f5;color:#788497;font-size:10px;font-weight:700}
       .issue-actions{display:flex;align-items:center;gap:7px;white-space:nowrap}
       .app-footer{margin-top:28px;padding:18px 12px 4px;border-top:1px solid #e2e7ef;color:#8490a2;font-size:12px;text-align:center}
+      @media (min-width:821px){aside{width:320px}main{margin-left:320px}}
     </style>
   </head>
   <body>
@@ -20,7 +23,7 @@
       <button class="nav" data-page="issue">↗ เบิกสินค้า</button>
       <button class="nav" data-page="products">□ รายการสินค้า</button>
       <button class="nav" data-page="history">◷ ประวัติ</button>
-      <div class="ready">● พร้อมใช้งานออฟไลน์<small>ข้อมูลเก็บในเครื่องนี้</small></div>
+      <div class="ready">● ส่งไฟล์ทั้งหมดเข้า Line ก่อนปิดโกดัง<small>หากลืมโดนเสธอาร์มเก็บยอดระบบเท็กซัส</small></div>
     </aside>
     <main>
       <header><div><h1 id="pageTitle">สแกนกล่องพัสดุ</h1><p id="today"></p></div><label>ผู้ใช้งาน<input id="operator" value="Arm" /></label></header>
@@ -33,7 +36,7 @@
       </section>
 
       <section class="page" id="issuePage">
-        <div class="metrics"><article><span>รายการเบิกวันนี้</span><strong id="issueCount">0</strong><small>รายการ</small></article><button id="exportIssues" class="outline">⇩ ส่งออกไฟล์เบิก .xlsx</button></div>
+        <div class="metrics"><article><span>รายการเบิกวันนี้</span><strong id="issueCount">0</strong><small>รายการ</small></article><button id="exportIssues" class="outline">⇩ ส่งออกไฟล์เบิกรายวัน .xlsx</button></div>
         <div class="card scanner"><h2>สแกนเพื่อเบิกสินค้า</h2><p>ต้องนำเข้าไฟล์รายการสินค้าจาก BlueWell Inventory ก่อนเริ่มใช้งาน</p><form id="issueForm" class="issue-form"><label>บาร์โค้ดสินค้า<input id="issueBarcode" placeholder="ยิงบาร์โค้ดสินค้า..." autocomplete="off" /></label><label>จำนวนเบิก<input id="issueQuantity" type="number" min="1" value="1" /></label><label class="wide">หมายเหตุการเบิก <em>*</em><textarea id="issueNote" required placeholder="ระบุว่าเบิกไปใช้ทำอะไร"></textarea></label><div id="productPreview" class="preview wide">รอยิงบาร์โค้ดสินค้า</div><button>ยืนยันเบิก</button></form></div>
         <div class="card"><h2>รายการเบิกล่าสุด</h2><div class="table"><table><thead><tr><th>สินค้า</th><th>จำนวน</th><th>หมายเหตุ</th><th>ผู้เบิก</th><th>เวลา</th><th>จัดการ</th></tr></thead><tbody id="issueRows"></tbody></table></div></div>
       </section>
