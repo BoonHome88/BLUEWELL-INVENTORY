@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
-import JsBarcode from "jsbarcode";
+import QRCode from "qrcode";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -40,7 +40,7 @@ import {
   Upload,
   Image as ImageIcon,
   Database,
-  Barcode,
+  QrCode,
   FileUp,
 } from "lucide-react";
 import { supabase } from "./supabase";
@@ -627,7 +627,7 @@ function App() {
     const rows = products
       .filter((p) => p.is_active)
       .map((p) => ({
-        บาร์โค้ดสินค้า: p.barcode || p.sku,
+        รหัสคิวอาร์สินค้า: p.barcode || p.sku,
         รหัสสินค้าในระบบ: p.id,
         ชื่อสินค้า: p.name,
         หน่วย: p.unit || "ชิ้น",
@@ -645,20 +645,18 @@ function App() {
     notify("ส่งออกรายการสินค้าสำหรับเครื่องออฟไลน์แล้ว");
   };
 
-  const printProductBarcode = (product) => {
+  const printProductBarcode = async (product) => {
     const value = String(product.barcode || product.sku || "").trim();
-    if (!value) return notify("สินค้านี้ยังไม่มีบาร์โค้ด");
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    JsBarcode(svg, value, {
-      format: "CODE128",
-      displayValue: true,
-      fontSize: 16,
-      height: 56,
-      margin: 10,
+    if (!value) return notify("สินค้านี้ยังไม่มีรหัส QR Code");
+    const qrDataUrl = await QRCode.toDataURL(value, {
+      errorCorrectionLevel: "H",
+      width: 300,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
     });
     const popup = window.open("", "_blank", "width=520,height=420");
-    if (!popup) return notify("กรุณาอนุญาตหน้าต่างป๊อปอัปเพื่อพิมพ์บาร์โค้ด");
-    popup.document.write(`<!doctype html><html lang="th"><head><title>พิมพ์บาร์โค้ด</title><style>body{font-family:Tahoma,sans-serif;display:grid;place-items:center;padding:30px}.label{text-align:center;border:1px dashed #bbb;padding:22px;min-width:360px}.label h2{font-size:18px;margin:0 0 12px}@media print{.no-print{display:none}.label{border:0}}</style></head><body><div class="label"><h2>${product.name.replaceAll("<", "&lt;")}</h2>${svg.outerHTML}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+    if (!popup) return notify("กรุณาอนุญาตหน้าต่างป๊อปอัปเพื่อพิมพ์ QR Code");
+    popup.document.write(`<!doctype html><html lang="th"><head><title>พิมพ์ QR Code</title><style>body{font-family:Tahoma,sans-serif;display:grid;place-items:center;padding:30px}.label{text-align:center;border:1px dashed #bbb;padding:22px;min-width:320px}.label h2{font-size:18px;margin:0 0 10px}.label img{width:260px;height:260px;image-rendering:pixelated}.code{font:700 15px monospace;letter-spacing:.5px;margin-top:8px}@media print{.label{border:0}}</style></head><body><div class="label"><h2>${product.name.replaceAll("<", "&lt;")}</h2><img src="${qrDataUrl}" alt="QR Code"><div class="code">${value.replaceAll("<", "&lt;")}</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
     popup.document.close();
   };
 
@@ -682,7 +680,7 @@ function App() {
       );
       const normalized = rawRows.map((row, index) => {
         const barcode = String(
-          row["บาร์โค้ดสินค้า"] || row.barcode || row["Barcode"] || "",
+          row["รหัสคิวอาร์สินค้า"] || row["QR Code"] || row["บาร์โค้ดสินค้า"] || row.barcode || row["Barcode"] || "",
         )
           .trim()
           .toUpperCase();
@@ -699,7 +697,7 @@ function App() {
         const rowId = String(row["รหัสรายการ"] || row.row_id || `${index + 1}`);
         const product = productByBarcode.get(barcode);
         const errors = [];
-        if (!barcode) errors.push("ไม่มีบาร์โค้ด");
+        if (!barcode) errors.push("ไม่มีรหัส QR Code");
         if (!product) errors.push("ไม่พบสินค้า");
         if (!Number.isInteger(quantity) || quantity <= 0)
           errors.push("จำนวนไม่ถูกต้อง");
@@ -2140,7 +2138,7 @@ function App() {
                   <thead>
                     <tr>
                       <th>สินค้า</th>
-                      <th>บาร์โค้ด</th>
+                      <th>QR Code</th>
                       <th>จำนวนลัง</th>
                       <th>จำนวนต่อลัง</th>
                       <th>คงเหลือ</th>
@@ -2198,10 +2196,10 @@ function App() {
                               <button
                                 type="button"
                                 className="icon-btn"
-                                title="พิมพ์ฉลากบาร์โค้ด"
+                                title="พิมพ์ฉลาก QR Code"
                                 onClick={() => printProductBarcode(p)}
                               >
-                                <Barcode size={16} />
+                                <QrCode size={16} />
                               </button>
                             </div>
                           </td>
@@ -2308,7 +2306,7 @@ function App() {
                 <div>
                   <h2>นำเข้าใบเบิกจากเครื่องออฟไลน์</h2>
                   <p>
-                    เลือกไฟล์ Excel ที่ส่งออกจากระบบยิงบาร์โค้ด
+                    เลือกไฟล์ Excel ที่ส่งออกจากระบบสแกน QR Code
                     ตรวจสอบข้อมูล แล้วจึงยืนยันตัดคลังกลาง
                   </p>
                 </div>
@@ -2375,7 +2373,7 @@ function App() {
                     <thead>
                       <tr>
                         <th>ลำดับ</th>
-                        <th>บาร์โค้ด</th>
+                        <th>รหัส QR Code</th>
                         <th>สินค้า</th>
                         <th>จำนวน</th>
                         <th>หมายเหตุการเบิก</th>
@@ -3528,14 +3526,14 @@ function App() {
             <input name="name" defaultValue={editing?.name || ""} required />
           </label>
           <label>
-            บาร์โค้ดสินค้า
+            รหัส QR Code สินค้า
             <input
               name="barcode"
               defaultValue={editing?.barcode || editing?.sku || ""}
               placeholder="เว้นว่างเพื่อให้ระบบสร้างรหัส BW อัตโนมัติ"
             />
             <small>
-              ใช้บาร์โค้ดจากโรงงานได้ หรือเว้นว่างเพื่อสร้าง Code 128 ใหม่
+              ใช้รหัสเดิมของสินค้าได้ หรือเว้นว่างเพื่อสร้างรหัส QR Code ใหม่
               โดยอัตโนมัติ
             </small>
           </label>
