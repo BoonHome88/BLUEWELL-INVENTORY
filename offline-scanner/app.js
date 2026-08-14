@@ -8,6 +8,16 @@ const dateKey = value => new Date(value).toLocaleDateString("sv-SE");
 const today = () => dateKey(new Date());
 const safe = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const save = () => { localStorage.setItem(key("products"),JSON.stringify(products)); localStorage.setItem(key("parcels"),JSON.stringify(parcels)); localStorage.setItem(key("issues"),JSON.stringify(issues)); localStorage.setItem(key("operator"),$("operator").value.trim()); };
+let installPrompt;
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").then(()=>document.body.classList.add("pwa-ready")).catch(()=>{}));
+}
+window.addEventListener("beforeinstallprompt",event=>{
+  event.preventDefault();installPrompt=event;$("installApp").style.display="block";
+});
+window.addEventListener("appinstalled",()=>{$("installApp").style.display="none";installPrompt=null;toast("ติดตั้งแอปสำเร็จแล้ว")});
+window.addEventListener("online",()=>toast("กลับมาออนไลน์แล้ว"));
+window.addEventListener("offline",()=>toast("กำลังใช้งานแบบออฟไลน์"));
 function toast(text){const el=$("toast");el.textContent=text;el.style.display="block";setTimeout(()=>el.style.display="none",2300)}
 function excel(filename,sheetName,rows){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,sheetName);XLSX.writeFile(wb,filename)}
 function render(){const tp=parcels.filter(x=>dateKey(x.created_at)===today());const ti=issues.filter(x=>dateKey(x.scanned_at)===today());$("parcelCount").textContent=tp.length;$("issueCount").textContent=ti.length;$("parcelRows").innerHTML=tp.slice().reverse().slice(0,10).map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td>${new Date(x.created_at).toLocaleTimeString("th-TH")}</td><td>${safe(x.operator)}</td></tr>`).join("")||`<tr><td colspan="3">ยังไม่มีรายการ</td></tr>`;$("issueRows").innerHTML=ti.slice().reverse().slice(0,10).map(x=>`<tr><td><b>${safe(x.product_name)}</b><br><code>${safe(x.barcode)}</code></td><td>${x.quantity} ${safe(x.unit)}</td><td>${safe(x.note)}</td><td>${safe(x.operator)}</td><td>${new Date(x.scanned_at).toLocaleTimeString("th-TH")}</td></tr>`).join("")||`<tr><td colspan="5">ยังไม่มีรายการ</td></tr>`;$("productSummary").textContent=`${products.length.toLocaleString()} รายการ · อัปเดตล่าสุด ${localStorage.getItem(key("products-updated"))||"-"}`;$("productRows").innerHTML=products.map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td><b>${safe(x.name)}</b></td><td>${safe(x.unit)}</td><td>${Number(x.stock||0).toLocaleString()} ${safe(x.unit)}</td></tr>`).join("")||`<tr><td colspan="4">กรุณานำเข้าไฟล์รายการสินค้าจากเว็บสต็อก</td></tr>`;const history=[...parcels.map(x=>({...x,type:"พัสดุ",name:x.barcode,quantity:"1 กล่อง",note:"",time:x.created_at})),...issues.map(x=>({...x,type:"เบิกสินค้า",name:x.product_name,quantity:`${x.quantity} ${x.unit}`,time:x.scanned_at}))].sort((a,b)=>b.time.localeCompare(a.time));$("historyRows").innerHTML=history.map(x=>`<tr><td><span class="badge">${x.type}</span></td><td>${safe(x.name)}</td><td>${safe(x.quantity)}</td><td>${safe(x.note)}</td><td>${safe(x.operator)}</td><td>${new Date(x.time).toLocaleString("th-TH")}</td></tr>`).join("")||`<tr><td colspan="6">ยังไม่มีประวัติ</td></tr>`}
@@ -16,7 +26,7 @@ function renderUpdated(){
   const ti=issues.filter(x=>dateKey(x.scanned_at)===today());
   $("parcelCount").textContent=tp.length;
   $("issueCount").textContent=ti.length;
-  $("parcelRows").innerHTML=tp.slice().reverse().slice(0,10).map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td>${new Date(x.created_at).toLocaleTimeString("th-TH")}</td><td>${safe(x.operator)}</td></tr>`).join("")||`<tr><td colspan="3">ยังไม่มีรายการ</td></tr>`;
+  $("parcelRows").innerHTML=tp.slice().reverse().map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td>${new Date(x.created_at).toLocaleTimeString("th-TH")}</td><td>${safe(x.operator)}</td><td><button class="delete-parcel" data-delete-parcel="${safe(x.id)}">ลบ</button></td></tr>`).join("")||`<tr><td colspan="4">ยังไม่มีรายการ</td></tr>`;
   $("issueRows").innerHTML=ti.slice().reverse().slice(0,10).map(x=>`<tr><td><b>${safe(x.product_name)}</b><br><code>${safe(x.barcode)}</code></td><td>${x.quantity} ${safe(x.unit)}</td><td>${safe(x.note)}</td><td>${safe(x.operator)}</td><td>${new Date(x.scanned_at).toLocaleTimeString("th-TH")}</td><td><div class="issue-actions">${x.batch_id?`<span class="exported-label">ส่งออกแล้ว</span>`:""}<button class="delete-issue" data-delete-issue="${safe(x.row_id)}">ลบ</button></div></td></tr>`).join("")||`<tr><td colspan="6">ยังไม่มีรายการ</td></tr>`;
   $("productSummary").textContent=`${products.length.toLocaleString()} รายการ · อัปเดตล่าสุด ${localStorage.getItem(key("products-updated"))||"-"}`;
   $("productRows").innerHTML=products.map(x=>`<tr><td><code>${safe(x.barcode)}</code></td><td><b>${safe(x.name)}</b></td><td>${safe(x.unit)}</td><td>${Number(x.stock||0).toLocaleString()} ${safe(x.unit)}</td></tr>`).join("")||`<tr><td colspan="4">กรุณานำเข้าไฟล์รายการสินค้าจากเว็บสต็อก</td></tr>`;
@@ -33,13 +43,53 @@ $("issueRows").addEventListener("click",e=>{
   issues=issues.filter(x=>x.row_id!==row.row_id);
   save();render();toast("ลบรายการเบิกแล้ว");
 });
+$("installApp").onclick=async()=>{
+  if(!installPrompt)return toast("เปิดผ่าน Netlify ด้วย Chrome หรือ Edge เพื่อใช้ปุ่มติดตั้ง");
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt=null;$("installApp").style.display="none";
+};
+$("parcelRows").addEventListener("click",e=>{
+  const button=e.target.closest("[data-delete-parcel]");
+  if(!button)return;
+  const row=parcels.find(x=>x.id===button.dataset.deleteParcel);
+  if(!row)return;
+  if(!confirm(`ลบเลขพัสดุ “${row.barcode}” ออกจากรายการหรือไม่?`))return;
+  parcels=parcels.filter(x=>x.id!==row.id);
+  save();render();toast("ลบเลขพัสดุแล้ว");
+  $("parcelBarcode").focus();
+});
 document.querySelectorAll(".nav").forEach(btn=>btn.onclick=()=>{document.querySelectorAll(".nav,.page").forEach(x=>x.classList.remove("active"));btn.classList.add("active");$(`${btn.dataset.page}Page`).classList.add("active");$("pageTitle").textContent=btn.textContent.trim().replace(/^[▣↗□◷]\s*/,"");setTimeout(()=>$(btn.dataset.page==="parcel"?"parcelBarcode":btn.dataset.page==="issue"?"issueBarcode":"operator")?.focus(),0)});
 $("operator").value=localStorage.getItem(key("operator"))||"Arm";$("operator").onchange=save;$("today").textContent=new Date().toLocaleDateString("th-TH",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-$("parcelForm").onsubmit=e=>{e.preventDefault();const barcode=$("parcelBarcode").value.trim(),operator=$("operator").value.trim();if(!barcode||!operator)return toast("กรุณาระบุผู้สแกนและบาร์โค้ด");if(parcels.some(x=>x.barcode===barcode))return toast("เลขพัสดุนี้ถูกสแกนแล้ว");parcels.push({id:id(),barcode,operator,created_at:new Date().toISOString()});$("parcelBarcode").value="";save();render();toast("บันทึกกล่องพัสดุแล้ว")};
+$("parcelExportDate").value=today();
+$("issueExportDate").value=today();
+let parcelScanTimer;
+let parcelSaving=false;
+function saveParcelScan(){
+  if(parcelSaving)return;
+  const barcode=$("parcelBarcode").value.trim(),operator=$("operator").value.trim();
+  if(!barcode)return;
+  if(!operator)return toast("กรุณาระบุผู้สแกน");
+  parcelSaving=true;
+  if(parcels.some(x=>x.barcode===barcode))toast("เลขพัสดุนี้ถูกสแกนแล้ว");
+  else{
+    parcels.push({id:id(),barcode,operator,created_at:new Date().toISOString()});
+    save();render();toast("บันทึกเลขพัสดุแล้ว");
+  }
+  $("parcelBarcode").value="";
+  parcelSaving=false;
+  $("parcelBarcode").focus();
+}
+$("parcelBarcode").addEventListener("input",()=>{
+  clearTimeout(parcelScanTimer);
+  if(!$("parcelBarcode").value.trim())return;
+  parcelScanTimer=setTimeout(saveParcelScan,180);
+});
+$("parcelForm").onsubmit=e=>{e.preventDefault();clearTimeout(parcelScanTimer);saveParcelScan()};
 $("issueBarcode").oninput=()=>{const code=$("issueBarcode").value.trim().toUpperCase();const p=products.find(x=>x.barcode===code);const el=$("productPreview");el.className=`preview wide ${p?"found":code?"error":""}`;el.textContent=p?`${p.name} · หน่วย ${p.unit} · ข้อมูลคงเหลือจากเว็บ ${Number(p.stock||0).toLocaleString()}`:code?"ไม่พบบาร์โค้ดนี้ในรายการสินค้า":"รอยิงบาร์โค้ดสินค้า"};
 $("issueForm").onsubmit=e=>{e.preventDefault();const barcode=$("issueBarcode").value.trim().toUpperCase(),quantity=Number($("issueQuantity").value),note=$("issueNote").value.trim(),operator=$("operator").value.trim(),p=products.find(x=>x.barcode===barcode);if(!p)return toast("ไม่พบบาร์โค้ดสินค้า");if(!Number.isInteger(quantity)||quantity<1)return toast("จำนวนเบิกไม่ถูกต้อง");if(!note)return toast("กรุณาระบุว่าเบิกไปใช้ทำอะไร");if(!operator)return toast("กรุณาระบุชื่อผู้เบิก");issues.push({row_id:id(),barcode,product_id:p.product_id,product_name:p.name,quantity,unit:p.unit,note,operator,scanned_at:new Date().toISOString()});$("issueBarcode").value="";$("issueQuantity").value=1;$("issueNote").value="";$("productPreview").className="preview wide";$("productPreview").textContent="รอยิงบาร์โค้ดสินค้า";save();render();toast("บันทึกรายการเบิกแล้ว");$("issueBarcode").focus()};
 $("productFile").onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const wb=XLSX.read(await file.arrayBuffer(),{type:"array"}),raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});products=raw.map(r=>({barcode:String(r["บาร์โค้ดสินค้า"]||r.barcode||"").trim().toUpperCase(),product_id:String(r["รหัสสินค้าในระบบ"]||r.product_id||""),name:String(r["ชื่อสินค้า"]||r.name||""),unit:String(r["หน่วย"]||r.unit||"ชิ้น"),units_per_case:Number(r["จำนวนชิ้นต่อลัง"]||1),stock:Number(r["คงเหลือคลังกลาง"]||0)})).filter(x=>x.barcode&&x.name);if(!products.length)throw new Error("ไม่พบข้อมูลสินค้าที่ถูกต้อง");localStorage.setItem(key("products-updated"),new Date().toLocaleString("th-TH"));save();render();toast(`นำเข้าสินค้า ${products.length} รายการแล้ว`)}catch(err){toast(`นำเข้าไม่สำเร็จ: ${err.message}`)}e.target.value=""};
-$("exportParcels").onclick=()=>{const rows=parcels.filter(x=>dateKey(x.created_at)===today()).map(x=>({"เลขพัสดุ":x.barcode,"วันเวลา":new Date(x.created_at),"ผู้สแกน":x.operator}));if(!rows.length)return toast("ยังไม่มีรายการวันนี้");excel(`parcel-scan-${today()}.xlsx`,"สแกนพัสดุ",rows)};
-$("exportIssues").onclick=()=>{const rows=issues.filter(x=>dateKey(x.scanned_at)===today());if(!rows.length)return toast("ยังไม่มีรายการเบิกวันนี้");const batch=`BW-OFF-${today().replaceAll("-","")}-${Date.now().toString(36).toUpperCase()}`;const ids=new Set(rows.map(x=>x.row_id));issues=issues.map(x=>ids.has(x.row_id)?{...x,batch_id:batch,exported_at:new Date().toISOString()}:x);save();excel(`BlueWell-Offline-Issue-${today()}-${batch.slice(-6)}.xlsx`,"เบิกสินค้า",rows.map(x=>({"รหัสชุดนำเข้า":batch,"รหัสรายการ":x.row_id,"วันที่รายการ":today(),"บาร์โค้ดสินค้า":x.barcode,"รหัสสินค้าในระบบ":x.product_id,"ชื่อสินค้า":x.product_name,"จำนวนเบิก":x.quantity,"หน่วย":x.unit,"หมายเหตุการเบิก":x.note,"ผู้เบิก":x.operator,"วันเวลา":new Date(x.scanned_at)})));render();toast(`ส่งออกรายการเบิกวันนี้ ${rows.length} รายการแล้ว`)};
+$("exportParcels").onclick=()=>{const selected=$("parcelExportDate").value||today();const rows=parcels.filter(x=>dateKey(x.created_at)===selected).map(x=>({"Tracking No.":x.barcode,"วันเวลา":new Date(x.created_at),"ผู้สแกน":x.operator}));if(!rows.length)return toast(`ไม่พบรายการพัสดุวันที่ ${selected}`);excel(`parcel-scan-${selected}.xlsx`,"สแกนพัสดุ",rows);toast(`ส่งออกพัสดุวันที่ ${selected} จำนวน ${rows.length} รายการแล้ว`)};
+$("exportIssues").onclick=()=>{const selected=$("issueExportDate").value||today();const rows=issues.filter(x=>dateKey(x.scanned_at)===selected);if(!rows.length)return toast(`ไม่พบรายการเบิกวันที่ ${selected}`);const batch=`BW-OFF-${selected.replaceAll("-","")}-${Date.now().toString(36).toUpperCase()}`;const ids=new Set(rows.map(x=>x.row_id));issues=issues.map(x=>ids.has(x.row_id)?{...x,batch_id:batch,exported_at:new Date().toISOString()}:x);save();excel(`BlueWell-Offline-Issue-${selected}-${batch.slice(-6)}.xlsx`,"เบิกสินค้า",rows.map(x=>({"รหัสชุดนำเข้า":batch,"รหัสรายการ":x.row_id,"วันที่รายการ":selected,"บาร์โค้ดสินค้า":x.barcode,"รหัสสินค้าในระบบ":x.product_id,"ชื่อสินค้า":x.product_name,"จำนวนเบิก":x.quantity,"หน่วย":x.unit,"หมายเหตุการเบิก":x.note,"ผู้เบิก":x.operator,"วันเวลา":new Date(x.scanned_at)})));render();toast(`ส่งออกรายการเบิกวันที่ ${selected} จำนวน ${rows.length} รายการแล้ว`)};
 render=renderUpdated;
 render();
