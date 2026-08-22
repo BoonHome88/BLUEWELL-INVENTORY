@@ -244,6 +244,7 @@ function App() {
   const [productModal, setProductModal] = useState(false);
   const [prepackModal, setPrepackModal] = useState(false);
   const [prepackAction, setPrepackAction] = useState("pack");
+  const [prepackDeductCentral, setPrepackDeductCentral] = useState(true);
   const [prepackProduct, setPrepackProduct] = useState(null);
   const [prepackQuery, setPrepackQuery] = useState("");
   const [txModal, setTxModal] = useState(false);
@@ -272,6 +273,8 @@ function App() {
   const [caseCount, setCaseCount] = useState(0);
   const [piecesPerCase, setPiecesPerCase] = useState(1);
   const [loosePieces, setLoosePieces] = useState(0);
+  const [partialCaseCount, setPartialCaseCount] = useState(0);
+  const [partialCasePieces, setPartialCasePieces] = useState(0);
   const [backupBusy, setBackupBusy] = useState(false);
   const [offlineFile, setOfflineFile] = useState(null);
   const [offlineBatchId, setOfflineBatchId] = useState("");
@@ -517,6 +520,7 @@ function App() {
     const unitsPerCase = Math.max(1, Number(f.get("units_per_case") || 1));
     const initialQuantity =
       Math.max(0, Number(f.get("case_count") || 0)) * unitsPerCase +
+      Math.max(0, Number(f.get("partial_case_pieces") || 0)) +
       Math.max(0, Number(f.get("loose_quantity") || 0));
     const payload = {
       sku: autoSku,
@@ -525,6 +529,14 @@ function App() {
       category_id: editing?.category_id || null,
       unit: "ชิ้น",
       units_per_case: unitsPerCase,
+      partial_case_count: Math.max(
+        0,
+        Number(f.get("partial_case_count") || 0),
+      ),
+      partial_case_pieces: Math.max(
+        0,
+        Number(f.get("partial_case_pieces") || 0),
+      ),
       min_stock: Math.max(0, Number(f.get("min_stock") || 0)),
       is_active: f.get("is_active") === "true",
     };
@@ -856,6 +868,7 @@ function App() {
 
   const openPrepackModal = (action, product = null) => {
     setPrepackAction(action);
+    setPrepackDeductCentral(true);
     setPrepackProduct(product);
     setPrepackModal(true);
   };
@@ -889,6 +902,8 @@ function App() {
         p_transaction_type: prepackAction,
         p_quantity: quantity,
         p_note: `${conversionNote}${f.get("note") || ""}`.trim(),
+        p_deduct_central:
+          prepackAction === "pack" ? prepackDeductCentral : true,
       });
       if (error) throw error;
       setPrepackModal(false);
@@ -2124,6 +2139,8 @@ function App() {
                         setCaseCount(0);
                         setPiecesPerCase(1);
                         setLoosePieces(0);
+                        setPartialCaseCount(0);
+                        setPartialCasePieces(0);
                         setProductModal(true);
                       }}
                     >
@@ -2154,10 +2171,22 @@ function App() {
                         1,
                         Number(p.units_per_case || 1),
                       );
-                      const fullCases = Math.floor(
-                        Number(p.quantity || 0) / unitsPerCase,
+                      const partialPieces = Math.min(
+                        Number(p.quantity || 0),
+                        Number(p.partial_case_pieces || 0),
                       );
-                      const remainder = Number(p.quantity || 0) % unitsPerCase;
+                      const fullCases = Math.floor(
+                        Math.max(
+                          0,
+                          Number(p.quantity || 0) - partialPieces,
+                        ) / unitsPerCase,
+                      );
+                      const remainder = Math.max(
+                        0,
+                          Number(p.quantity || 0) -
+                            fullCases * unitsPerCase -
+                          partialPieces,
+                      );
                       const isLow =
                         p.is_active &&
                         Number(p.min_stock || 0) > 0 &&
@@ -2185,6 +2214,11 @@ function App() {
                                 {remainder > 0 && (
                                   <small>
                                     เศษ {remainder.toLocaleString()} ชิ้น
+                                  </small>
+                                )}
+                                {Number(p.partial_case_count || 0) > 0 && (
+                                  <small>
+                                    ลังย่อย {Number(p.partial_case_count).toLocaleString()} ลัง รวม {partialPieces.toLocaleString()} ชิ้น
                                   </small>
                                 )}
                               </div>
@@ -2265,6 +2299,12 @@ function App() {
                                         1,
                                         Number(p.units_per_case || 1),
                                       ),
+                                    );
+                                    setPartialCaseCount(
+                                      Number(p.partial_case_count || 0),
+                                    );
+                                    setPartialCasePieces(
+                                      Number(p.partial_case_pieces || 0),
                                     );
                                     setImagePreview(
                                       productImageUrl(p.image_path),
@@ -3567,6 +3607,31 @@ function App() {
                   />
                 </label>
                 <label>
+                  จำนวนลังย่อย
+                  <input
+                    name="partial_case_count"
+                    type="number"
+                    min="0"
+                    value={partialCaseCount}
+                    onChange={(e) =>
+                      setPartialCaseCount(Math.max(0, Number(e.target.value) || 0))
+                    }
+                  />
+                </label>
+                <label>
+                  จำนวนชิ้นรวมในลังย่อย
+                  <input
+                    name="partial_case_pieces"
+                    type="number"
+                    min="0"
+                    value={partialCasePieces}
+                    onChange={(e) =>
+                      setPartialCasePieces(Math.max(0, Number(e.target.value) || 0))
+                    }
+                  />
+                  <small>เช่น 3 ลังย่อย รวม 12 ชิ้น</small>
+                </label>
+                <label>
                   เศษชิ้นเริ่มต้น
                   <input
                     name="loose_quantity"
@@ -3582,12 +3647,15 @@ function App() {
               <p className="case-conversion-preview">
                 <span>คงเหลือเริ่มต้น</span>
                 <strong>
-                  {(caseCount * piecesPerCase + loosePieces).toLocaleString()}{" "}
+                  {(caseCount * piecesPerCase + partialCasePieces + loosePieces).toLocaleString()}{" "}
                   ชิ้น
                 </strong>
                 <small>
                   {caseCount.toLocaleString()} ลัง ×{" "}
                   {piecesPerCase.toLocaleString()} ชิ้น{" "}
+                  {partialCaseCount > 0
+                    ? `+ ${partialCaseCount.toLocaleString()} ลังย่อย รวม ${partialCasePieces.toLocaleString()} ชิ้น `
+                    : ""}
                   {loosePieces > 0
                     ? `+ เศษ ${loosePieces.toLocaleString()} ชิ้น`
                     : ""}
@@ -3595,10 +3663,21 @@ function App() {
               </p>
             </>
           ) : (
-            <p className="info-box">
-              คงเหลือปัจจุบัน {Number(editing.quantity || 0).toLocaleString()}{" "}
-              ชิ้น — การแก้จำนวนชิ้นต่อลังจะไม่เปลี่ยนยอดสต็อกปัจจุบัน
-            </p>
+            <>
+              <div className="form-grid">
+                <label>
+                  จำนวนลังย่อยปัจจุบัน
+                  <input name="partial_case_count" type="number" min="0" value={partialCaseCount} onChange={(e) => setPartialCaseCount(Math.max(0, Number(e.target.value) || 0))} />
+                </label>
+                <label>
+                  จำนวนชิ้นรวมในลังย่อย
+                  <input name="partial_case_pieces" type="number" min="0" max={Number(editing.quantity || 0)} value={partialCasePieces} onChange={(e) => setPartialCasePieces(Math.max(0, Number(e.target.value) || 0))} />
+                </label>
+              </div>
+              <p className="info-box">
+                คงเหลือปัจจุบัน {Number(editing.quantity || 0).toLocaleString()} ชิ้น — การแก้ข้อมูลลังจะไม่เปลี่ยนยอดสต็อกปัจจุบัน
+              </p>
+            </>
           )}
           <label>
             สถานะสินค้า
@@ -3867,14 +3946,30 @@ function App() {
           {prepackAction === "pack" ? (
             <>
               <p className="info-box">
-                รายการนี้จะหักสินค้าออกจากคลังกลางและเพิ่มเข้าคลังพรีแพ็คทันที
+                {prepackDeductCentral
+                  ? "รายการนี้จะหักสินค้าออกจากคลังกลางและเพิ่มเข้าคลังพรีแพ็คทันที"
+                  : "รายการนี้จะเพิ่มเข้าคลังพรีแพ็คโดยไม่หักสต็อกคลังกลาง"}
               </p>
+              <label>
+                แหล่งสินค้า
+                <select
+                  value={prepackDeductCentral ? "central" : "external"}
+                  onChange={(e) => setPrepackDeductCentral(e.target.value === "central")}
+                >
+                  <option value="central">ตัดจากสต็อกคลังกลาง</option>
+                  <option value="external">ไม่ตัดสต็อกคลังกลาง</option>
+                </select>
+              </label>
               <label>
                 สินค้า
                 <select name="product_id" required autoFocus>
                   <option value="">เลือกสินค้า</option>
                   {products
-                    .filter((p) => p.is_active && Number(p.quantity || 0) > 0)
+                    .filter(
+                      (p) =>
+                        p.is_active &&
+                        (!prepackDeductCentral || Number(p.quantity || 0) > 0),
+                    )
                     .map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} — คลังกลาง{" "}
@@ -3951,7 +4046,7 @@ function App() {
               {busy ? (
                 <Spinner />
               ) : prepackAction === "pack" ? (
-                "ย้ายเข้าพรีแพ็ค"
+                prepackDeductCentral ? "ย้ายเข้าพรีแพ็ค" : "เพิ่มเข้าพรีแพ็ค"
               ) : prepackAction === "ship" ? (
                 "ยืนยันพร้อมส่ง"
               ) : (

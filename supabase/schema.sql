@@ -135,6 +135,8 @@ create table if not exists public.products (
   quantity integer not null default 0 check (quantity >= 0),
   unit text not null default 'ชิ้น',
   units_per_case integer not null default 1 check (units_per_case > 0),
+  partial_case_count integer not null default 0 check (partial_case_count >= 0),
+  partial_case_pieces integer not null default 0 check (partial_case_pieces >= 0),
   min_stock integer not null default 0 check (min_stock >= 0),
   image_path text,
   is_active boolean not null default true,
